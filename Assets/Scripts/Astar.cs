@@ -22,13 +22,28 @@ public class Astar
     public List<Vector2Int> FindPathToTarget(Vector2Int startPos, Vector2Int endPos, Cell[,] grid)
     {
         List<Node> openList = new List<Node>();
-        List<Node> closedList = new List<Node>();
+        List<Vector2Int> closedList = new List<Vector2Int>();
 
         Node currentNode = new Node(startPos, null, 0, 0);
+        Node endNode = new Node(endPos, null, 0, 0);
         openList.Add(currentNode);
 
-        while (openList.Count != 0)
+        int nodes = 0;
+
+        while (true)
         {
+            currentNode = openList[0];
+
+            for (int i = 1; i < openList.Count; i++) {
+                //if the two nodes have same fcost we check the hcost and then take the one closest to the end of the node
+                if (openList[i].FScore < currentNode.FScore || (openList[i].FScore == currentNode.FScore && openList[i].HScore < currentNode.HScore)) {
+                    currentNode = openList[i];
+                }
+            }
+
+            openList.Remove(currentNode);
+            closedList.Add(currentNode.position);
+
             if (currentNode.position == endPos)
             {
                 var path = new List<Vector2Int>();
@@ -43,78 +58,50 @@ public class Astar
                 return path;
             }
 
-            var neighbours = new List<Node>();
-            var Walls = LookForWalls(grid[currentNode.position.x, currentNode.position.y]);
+            foreach (Node neighbour in GetNeighbours(currentNode, grid)) {
+                if (closedList.Contains(neighbour.position)) {
+                    continue;
+                }
+                //so remeber gCost is shortest path from the start node and is what we use to check if shorter
+                float newCostToNeighbour = currentNode.GScore + Vector2Int.Distance(currentNode.position, neighbour.position);
 
-            for (int x = -1; x < 2; x++)
-            {
-                for (int y = -1; y < 2; y++)
-                {
-                    int neighbourX = currentNode.position.x + x;
-                    int neighbourY = currentNode.position.y + y;
-
-                    if (neighbourX < 0 || neighbourX >= grid.GetLength(0) || neighbourY < 0 || neighbourY >= grid.GetLength(1) || Mathf.Abs(x) == Mathf.Abs(y))
-                        continue;
-
-                    bool Break = false;
-                    for (int i = 0; i < Walls.Count; i++)
-                    {
-                        if (new Vector2Int(x, y) == Walls[i])
-                        {
-                            Debug.Log("Found wall");
-                            Break = true;
-                        }
+                if (newCostToNeighbour < neighbour.GScore || !openList.Contains(neighbour)) {
+                    neighbour.GScore = newCostToNeighbour;
+                    neighbour.HScore = Vector2Int.Distance(currentNode.position, endNode.position);
+                    neighbour.parent = currentNode;
+                    if (!openList.Contains(neighbour)) {
+                        openList.Add(neighbour);
                     }
-
-                    for (int i = 0; i < closedList.Count; i++)
-                    {
-                        if (closedList[i].position == new Vector2Int(neighbourX, neighbourY))
-                        {
-                            Debug.Log("in closed list");
-                            Break = true;
-                        }
-                    }
-                    if (Break)
-                        continue;
-
-                    var tmpNode = new Node(new Vector2Int(neighbourX, neighbourY), null, 0, 0);
-
-                    DefineNodes(startPos, endPos, tmpNode);
-                    neighbours.Add(tmpNode);
                 }
             }
 
-            //Node lowestScoringNode = neighbours.OrderBy(node => node.FScore).First();
-            Node lowestScoringNode = null;
-
-            if (neighbours.Count == 0)
-                Debug.Log("list Empty");
-
-            for (int i = 0; i < neighbours.Count; i++)
-            {
-                if (lowestScoringNode == null)
-                    lowestScoringNode = neighbours[i];
-                if (neighbours[i].FScore < lowestScoringNode.FScore)
-                    lowestScoringNode = neighbours[i];
-            }
-
-            if (lowestScoringNode == null)
-                Debug.Log("No Neighbours");
-
-            lowestScoringNode.parent = currentNode;
-            openList.Remove(currentNode);
-            closedList.Add(currentNode);
-
-            currentNode = lowestScoringNode;
-
-            openList.Add(currentNode);
+            nodes++;
         }
         return null;
     }
 
-    public bool CheckNeighbours()
+    public List<Node> GetNeighbours(Node currentNode, Cell[,] grid)
     {
-        return true;
+        var neighbours = new List<Node>();
+        var Walls = LookForWalls(grid[currentNode.position.x, currentNode.position.y]);
+
+        for (int x = -1; x < 2; x++) 
+        for (int y = -1; y < 2; y++) {
+            int neighbourX = currentNode.position.x + x;
+            int neighbourY = currentNode.position.y + y;
+
+            if (neighbourX < 0 || neighbourX >= grid.GetLength(0) || neighbourY < 0 || neighbourY >= grid.GetLength(1) || Mathf.Abs(x) == Mathf.Abs(y))
+                continue;
+
+            if(Walls.Contains(new Vector2Int(x, y))) {
+                continue;
+            }
+
+            var tmpNode = new Node(new Vector2Int(neighbourX, neighbourY), null, 0, 0);
+            neighbours.Add(tmpNode);
+        }
+
+        return neighbours;
     }
 
     public List<Vector2Int> LookForWalls(Cell cell)
@@ -134,6 +121,10 @@ public class Astar
         if(node.parent != null)
             node.GScore = node.parent.GScore + Vector2Int.Distance(node.position, node.parent.position);
         node.HScore = Vector2Int.Distance(node.position, endPos);
+    }
+
+    int Distance(Node node, Node goalNode) {
+        return (int)Mathf.Abs(node.position.y - goalNode.position.y) + Mathf.Abs(node.position.x - goalNode.position.x);
     }
 
     /// <summary>
